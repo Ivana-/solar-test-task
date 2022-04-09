@@ -49,32 +49,21 @@
 
 ;; public api handler ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; first way - limiting max-connections for so requests per each input request (local tag-ch etc.)
-
-;; (defn search [{:keys [params]}]
-;;   (let [{:keys [tag]} params
-;;         tags (set (if (string? tag) [tag] tag))
-;;         tag-ch (chan max-connections)
-;;         res-ch (chan)]
-;;     (doseq [_ tags] (go (>! res-ch (request-tag-data (<! tag-ch)))))
-;;     (doseq [tag tags] (>!! tag-ch tag))
-;;     (->> tags
-;;          (reduce (fn [acc _] (merge-with (partial merge-with +) acc (<!! res-ch))) {})
-;;          (format-response tags))))
-
-;; second way - limiting max-connections for so requests per all input requests (global tag-ch, adding [tag res-ch] etc.)
-;; needs in very strong (!) tests for avoid blocking global tag-ch and that funny logic when one request creates processes
-;; which may return data to another one etc.
-
-(defonce ^:private tag-ch (chan max-connections))
+;; we can define it ether as global channel - for limiting connections on any async income requests
+;; or local one (see below in let form inside search - for limiting connections per each input request)
+;; (defonce ^:private con_ch (chan max-connections))
 
 (defn search [{:keys [params]}]
   (let [{:keys [tag]} params
         tags (set (if (string? tag) [tag] tag))
-        res-ch (chan)]
-    (doseq [_ tags] (go (let [[tag ch] (<! tag-ch)]
-                          (>! ch (request-tag-data tag)))))
-    (doseq [tag tags] (>!! tag-ch [tag res-ch]))
+        con_ch (chan max-connections) ;; may comment here & uncomment global one above
+        res-ch (chan) ;; may make it buffered as (chan (count tags)) - it affects olny on little performance issues, not critical imho
+        ]
+    (doseq [tag tags]
+      (>!! con_ch 1)
+      (go (let [res (request-tag-data tag)]
+            (<! con_ch)
+            (>! res-ch res))))
     (->> tags
          (reduce (fn [acc _] (merge-with (partial merge-with +) acc (<!! res-ch))) {})
          (format-response tags))))
