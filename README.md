@@ -46,6 +46,12 @@ To start a web server for the application, run:
 
     lein ring server
 
+## Result
+
+![alt text](https://user-images.githubusercontent.com/10473034/162554950-7b1162a9-015d-40c9-be19-16a310e505b3.png "Valid answer")
+
+![alt text](https://user-images.githubusercontent.com/10473034/162554969-4037e917-6332-4eef-86c6-fca2f6b23a77.png "Errors")
+
 ## License
 
 Copyright © 2022 Ivana
