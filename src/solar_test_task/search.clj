@@ -67,3 +67,89 @@
     (->> tags
          (reduce (fn [acc _] (merge-with (partial merge-with +) acc (<!! res-ch))) {})
          (format-response tags))))
+
+
+(comment
+
+  (defn mock [i start]
+    (Thread/sleep (+ 1000 (* 5 i)))
+    (let [passed (quot (- (. System (nanoTime)) start) 1000000)]
+      (prn i passed)
+      i))
+
+  (defn test-go [start rng con-ch res-ch]
+    (doseq [i rng]
+      (>!! con-ch 1)
+      (go (let [res (mock i start)]
+            (<! con-ch)
+            (>! res-ch res)))))
+
+  (defn test-future [start rng con-ch res-ch]
+    (doseq [i rng]
+      (>!! con-ch 1)
+      (future (let [res (mock i start)]
+                (<!! con-ch)
+                (>!! res-ch res)))))
+
+  (defn run-wrapper [n test-impl]
+    (let [start (. System (nanoTime))
+          rng (range 1 (inc n))
+          con-ch (chan 10)
+          res-ch (chan)]
+      (test-impl start rng con-ch res-ch)
+      (reduce (fn [acc _] (conj acc (<!! res-ch))) [] rng)))
+
+  (run-wrapper 22 test-go) ;; limited by 8 processes - see below
+;; =>
+;; 1 1005
+;; 2 1010
+;; 3 1015
+;; 4 1020
+;; 5 1026
+;; 6 1032
+;; 7 1037
+;; 8 1042
+;; 9 2052
+;; 10 2061
+;; 11 2076
+;; 12 2081
+;; 13 2092
+;; 14 2104
+;; 15 2113
+;; 16 2123
+;; 17 3138
+;; 18 3152
+;; 19 3173
+;; 20 3183
+;; 21 3198
+;; 22 3214
+;; [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22]
+
+  (run-wrapper 22 test-future) ;; fits channel timit of 10 - see below
+;; =>
+;; 1 1005
+;; 2 1013
+;; 3 1018
+;; 4 1023
+;; 5 1033
+;; 6 1038
+;; 7 1044
+;; 8 1049
+;; 9 1055
+;; 10 1060
+;; 11 2063
+;; 12 2075
+;; 13 2085
+;; 14 2095
+;; 15 2112
+;; 16 2123
+;; 17 2131
+;; 18 2148
+;; 19 2157
+;; 20 2162
+;; 21 3170
+;; 22 3188
+;; [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22]
+
+;;
+)
